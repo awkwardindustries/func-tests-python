@@ -1,22 +1,22 @@
-import logging
-
-import azure.functions as func
 import json
+import logging
+import os
 import redis
+import azure.functions as func
 
 from azure.cosmos.aio import CosmosClient
-from azure.identity import DefaultAzureCredential
+#from azure.identity import DefaultAzureCredential
 
-AZURE_CRED = DefaultAzureCredential()
+#AZURE_CRED = DefaultAzureCredential()
 
-COSMOS_HOST = "https://awkwardindustries.documents.azure.com:443/"
-COSMOS_KEY = ""
+COSMOS_HOST = os.getenv("CosmosHost")
+COSMOS_KEY = os.getenv("CosmosKey")
 COSMOS_DATABASE = "ToDoList"
 COSMOS_CONTAINER = "Items"
 
-REDIS_HOST = ".redis.cache.windows.net"
-REDIS_PORT = "6380"
-REDIS_KEY = ""
+REDIS_HOST = os.getenv("RedisHost")
+REDIS_PORT = os.getenv("RedisPort")
+REDIS_KEY = os.getenv("RedisKey")
 REDIS_CLIENT = redis.Redis(
     host=REDIS_HOST,
     port=REDIS_PORT,
@@ -27,12 +27,7 @@ REDIS_CLIENT = redis.Redis(
 )
 
 HEADERS = {
-    "Content-type": "application/json",
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-    "X-XSS-Protection": "1",
-    "Content-Security-Policy": "default-src 'self'",
-    "Strict-Transport-Security": "max-age=86400"
+    "Content-type": "application/json"
 }
 
 async def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
