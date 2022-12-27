@@ -64,7 +64,8 @@ async def main(req: func.HttpRequest, context: func.Context) -> func.HttpRespons
                         try:
                             # Query Cosmos for the item
                             res_body = await container.read_item(
-                                item = COSMOS_CONTAINER,
+                                # item = COSMOS_CONTAINER,
+                                item = item_id,
                                 partition_key = item_id
                             )
                             # Close the Cosmos client
