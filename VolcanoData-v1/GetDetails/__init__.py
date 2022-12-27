@@ -11,8 +11,8 @@ from azure.cosmos.aio import CosmosClient
 
 COSMOS_HOST = os.getenv("CosmosHost")
 COSMOS_KEY = os.getenv("CosmosKey")
-COSMOS_DATABASE = "ToDoList"
-COSMOS_CONTAINER = "Items"
+COSMOS_DATABASE = os.getenv("CosmosDatabase")
+COSMOS_CONTAINER = os.getenv("CosmosContainer")
 
 REDIS_HOST = os.getenv("RedisHost")
 REDIS_PORT = os.getenv("RedisPort")
@@ -39,16 +39,16 @@ async def main(req: func.HttpRequest, context: func.Context) -> func.HttpRespons
             if req.params.get("heartbeat"):
                 return func.HttpResponse(
                     body = json.dumps({
-                        "message": "Function GetItems (v1) is alive!"
+                        "message": "Function GetDetails (v1) is alive!"
                     }),
                     status_code = 200,
                     headers = HEADERS
                 )
             # Else, not a heartbeat check
-            item_id = req.params.get("id")
-            if item_id:
+            lookup_id = req.params.get("lookup")
+            if lookup_id:
                 try:
-                    cached_item = get_item(id = item_id)
+                    cached_item = get_item(lookup_id = lookup_id)
                     if cached_item:
                         return func.HttpResponse(
                             body = cached_item,
@@ -64,15 +64,14 @@ async def main(req: func.HttpRequest, context: func.Context) -> func.HttpRespons
                         try:
                             # Query Cosmos for the item
                             res_body = await container.read_item(
-                                # item = COSMOS_CONTAINER,
-                                item = item_id,
-                                partition_key = item_id
+                                item = lookup_id,
+                                partition_key = lookup_id
                             )
                             # Close the Cosmos client
                             await cosmos_client.close()
                             # Add whatever was retrieved to cache
                             set_item(
-                                id = item_id,
+                                lookup_id = lookup_id,
                                 details = res_body
                             )
                             # Check what was received in case not found
@@ -80,9 +79,10 @@ async def main(req: func.HttpRequest, context: func.Context) -> func.HttpRespons
                                 statusCode = 200
                             else:
                                 raise Exception("Item not found")
-                        except:
+                        except Exception as e:
                             # Something raised an exception (lookup failed?)
                             # Close the Cosmos client
+                            logging.error("Cosmos client error: " + str(e))
                             await cosmos_client.close()
                             res_body = {
                                 "message": "Record not found"
@@ -98,7 +98,7 @@ async def main(req: func.HttpRequest, context: func.Context) -> func.HttpRespons
                     }
                     statusCode = 404
             else:
-                # No 'id' param provided
+                # No 'name' param provided
                 res_body = {
                     "message": "Invalid input"
                 }
@@ -123,26 +123,26 @@ async def main(req: func.HttpRequest, context: func.Context) -> func.HttpRespons
         headers = HEADERS
     )
 
-def get_item(id):
+def get_item(lookup_id):
     try:
-        item=REDIS_CLIENT.get(id)
+        item = REDIS_CLIENT.get(lookup_id)
         if item:
-            logging.info("Item [" + id + "] found in cache")
+            logging.info("Item [" + lookup_id + "] found in cache")
             return item
         else:
-            logging.info("Item [" + id + "] NOT in cache")
+            logging.info("Item [" + lookup_id + "] NOT in cache")
             return None
     except Exception as e:
         logging.error("Error checking cache: " + str(e))
         return None
 
-def set_item(id, details):
+def set_item(lookup_id, details):
     try:
-        result = REDIS_CLIENT.set(id, json.dumps(details))
+        result = REDIS_CLIENT.set(lookup_id, json.dumps(details))
         if result:
-            logging.info("Cached item [" + id + "]")
+            logging.info("Cached item [" + lookup_id + "]")
         else:
-            raise("Caching item " + id + " failed")
+            raise("Caching item " + lookup_id + " failed")
     except Exception as e:
         # Is this catching line 141 (raise catcching item failed)
         # too? Or only exceptions from client.set?
