@@ -4,16 +4,15 @@ import os
 import redis
 import azure.functions as func
 
-from azure.cosmos import CosmosClient
+from azure.cosmos.aio import CosmosClient
+#from azure.identity import DefaultAzureCredential
+
+#AZURE_CRED = DefaultAzureCredential()
 
 COSMOS_HOST = os.getenv("CosmosHost")
 COSMOS_KEY = os.getenv("CosmosKey")
-COSMOS_DATABASE_NAME = os.getenv("CosmosDatabase")
-COSMOS_CONTAINER_NAME = os.getenv("CosmosContainer")
-COSMOS_CLIENT = CosmosClient(COSMOS_HOST, COSMOS_KEY)
-COSMOS_DATABASE = COSMOS_CLIENT.get_database_client(COSMOS_DATABASE_NAME)
-COSMOS_CONTAINER = COSMOS_DATABASE.get_container_client(COSMOS_CONTAINER_NAME)
-
+COSMOS_DATABASE = os.getenv("CosmosDatabase")
+COSMOS_CONTAINER = os.getenv("CosmosContainer")
 
 REDIS_HOST = os.getenv("RedisHost")
 REDIS_PORT = os.getenv("RedisPort")
@@ -31,7 +30,7 @@ HEADERS = {
     "Content-type": "application/json"
 }
 
-def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
+async def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
     try:
         if context and context.invocation_id:
             HEADERS["Azure_InvocationId"] = context.invocation_id
@@ -57,13 +56,19 @@ def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
                             headers = HEADERS
                         )
                     else:
+                        cosmos_client = CosmosClient(COSMOS_HOST, COSMOS_KEY)
+                        # cosmos_client = CosmosClient(COSMOS_URI, AZURE_CRED)
+                        database = cosmos_client.get_database_client(COSMOS_DATABASE)
+                        container = database.get_container_client(COSMOS_CONTAINER)
                         
                         try:
                             # Query Cosmos for the item
-                            res_body = COSMOS_CONTAINER.read_item(
+                            res_body = await container.read_item(
                                 item = lookup_id,
                                 partition_key = lookup_id
                             )
+                            # Close the Cosmos client
+                            await cosmos_client.close()
                             # Add whatever was retrieved to cache
                             set_item(
                                 lookup_id = lookup_id,
@@ -76,7 +81,9 @@ def main(req: func.HttpRequest, context: func.Context) -> func.HttpResponse:
                                 raise Exception("Item not found")
                         except Exception as e:
                             # Something raised an exception (lookup failed?)
+                            # Close the Cosmos client
                             logging.error("Cosmos client error: " + str(e))
+                            await cosmos_client.close()
                             res_body = {
                                 "message": "Record not found"
                             }
