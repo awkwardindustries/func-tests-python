@@ -2,7 +2,7 @@
 # Resource Group
 # #####################################
 
-RG=rg-func-test-python
+RG=rg-func-test-pytho
 LOC=southcentralus
 
 # Create the resource group in which everything will land
@@ -13,8 +13,9 @@ az group create -g $RG -l $LOC
 # Function App
 # #####################################
 
-FUNC_STORAGE=stfunctest13
-FUNC_APPNAME=func-tests-python
+FUNC_STORAGE=stfunctest132
+FUNC_APPNAME=func-tests-pytho
+FUNC_PLAN=southcentraluspythoplan
 
 # Storage Account
 
@@ -28,15 +29,34 @@ az storage account create \
 # Note: Python v1 or v2 is set in the host.json
 # runtime-version 3.9, 3.8, 3.7, or 3.6
 
+# Simple Consumption Plan
+# az functionapp create \
+#   --resource-group $RG \
+#   --consumption-plan-location $LOC \
+#   --runtime python \
+#   --runtime-version 3.8 \
+#   --functions-version 4 \
+#   --os-type linux \
+#   --assign-identity '[system]' \
+#   --storage-account $FUNC_STORAGE \
+#   --name $FUNC_APPNAME
+
+# Production-like Plan & App
+az functionapp plan create \
+  --name $FUNC_PLAN \
+  --resource-group $RG \
+  --location "$LOC" \
+  --is-linux true \
+  --sku EP3
 az functionapp create \
   --resource-group $RG \
-  --consumption-plan-location $LOC \
   --runtime python \
   --runtime-version 3.8 \
   --functions-version 4 \
   --os-type linux \
   --assign-identity '[system]' \
   --storage-account $FUNC_STORAGE \
+  --plan $FUNC_PLAN \
   --name $FUNC_APPNAME
 
 # Use system-assigned managed identity
